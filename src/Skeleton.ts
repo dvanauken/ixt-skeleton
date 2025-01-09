@@ -5,16 +5,13 @@ import { Wavefront } from './Wavefront';
 import { Event } from './events/Event';
 import { Edge } from './Edge';
 import { Vertex } from './Vertex';
+import { Polyline } from './Polyline';
+// Assuming you have a Polyline class that can be built from a set of points
 
 interface Ridge {
     start: Vector;
     end: Vector;
     time: number;
-}
-
-interface SkeletonResult {
-    ridges: Ridge[];
-    events: Event[];
 }
 
 export class Skeleton {
@@ -25,20 +22,32 @@ export class Skeleton {
 
     constructor() {
         this.eventQueue = new EventQueue();
-        this.wavefront = null!; // Initialized in fromPolygon
+        this.wavefront = null!; // Will be initialized in compute()
     }
 
-    // Main entry point for skeleton computation
-    static fromPolygon(polygon: Polygon): SkeletonResult {
-        if (!polygon.validate()) {
+    /**
+     * Main entry point for building the skeleton from a polygon.
+     * Example client usage:
+     *
+     *    Polygon polygon = ...
+     *    Skeleton skeleton = Skeleton.Build(polygon);
+     *    Polyline[] polylines = skeleton.getPolylines();
+     */
+    public static Build(polygon: Polygon): Skeleton {
+        // Validate input polygon
+        if (!this.validateInputPolygon(polygon)) {
             throw new Error('Invalid polygon for straight skeleton computation');
         }
 
         const skeleton = new Skeleton();
-        return skeleton.compute(polygon);
+        skeleton.compute(polygon);
+        return skeleton;
     }
 
-    private compute(polygon: Polygon): SkeletonResult {
+    /**
+     * Computes the skeleton and stores results (ridges, events) in this instance.
+     */
+    private compute(polygon: Polygon): void {
         // Initialize computation
         this.initializeComputation(polygon);
 
@@ -50,19 +59,17 @@ export class Skeleton {
             // Process the event
             this.processEvent(event);
 
-            // Store processed event for result
+            // Store processed event
             this.processedEvents.push(event);
 
             // Find and queue new events
             this.findNewEvents();
         }
-
-        return {
-            ridges: this.ridges,
-            events: this.processedEvents
-        };
     }
 
+    /**
+     * Prepares the data structures for computation.
+     */
     private initializeComputation(polygon: Polygon): void {
         // Ensure counter-clockwise orientation
         if (polygon.isClockwise()) {
@@ -83,22 +90,28 @@ export class Skeleton {
         this.eventQueue.findSplitEvents(polygon.getVertices(), polygon.getEdges());
     }
 
+    /**
+     * Process a single skeleton event.
+     */
     private processEvent(event: Event): void {
         // Record ridge formation
         this.recordRidge(event);
 
-        // Execute event and get new events
+        // Execute the event and get potential follow-up events
         const newEvents = event.execute();
 
-        // Update wavefront
+        // Update wavefront based on the event
         this.wavefront.update(event);
 
-        // Add new events to queue
+        // Add follow-up events to the queue
         for (const newEvent of newEvents) {
             this.eventQueue.add(newEvent);
         }
     }
 
+    /**
+     * Finds and queues new events based on the current state of the wavefront.
+     */
     private findNewEvents(): void {
         // Get current state of wavefront
         const activeChains = this.wavefront.getActiveChains();
@@ -113,13 +126,15 @@ export class Skeleton {
         }
     }
 
+    /**
+     * Records the formation of skeleton "ridges" (edges in the straight skeleton)
+     * based on the current event.
+     */
     private recordRidge(event: Event): void {
-        // Record the formation of skeleton ridges based on event type
         for (const vertex of event.vertices) {
             const startPoint = vertex.position;
             const endPoint = event.point;
 
-            // Only add ridge if points are different
             if (!startPoint.equals(endPoint)) {
                 this.ridges.push({
                     start: startPoint,
@@ -130,7 +145,9 @@ export class Skeleton {
         }
     }
 
-    // Utility method to validate input polygon
+    /**
+     * Utility method to validate input polygon.
+     */
     private static validateInputPolygon(polygon: Polygon): boolean {
         return (
             polygon.getVertices().length >= 3 &&
@@ -139,13 +156,28 @@ export class Skeleton {
         );
     }
 
-    // Get the computed skeleton ridges
-    getRidges(): Ridge[] {
+    /**
+     * Returns an array of all recorded ridges (each ridge is a segment).
+     */
+    public getRidges(): Ridge[] {
         return [...this.ridges];
     }
 
-    // Get all processed events
-    getEvents(): Event[] {
+    /**
+     * Returns all events that were processed during skeleton construction.
+     */
+    public getEvents(): Event[] {
         return [...this.processedEvents];
+    }
+
+    /**
+     * Example method to convert ridges into polylines.
+     * (You'll need to implement your own logic in Polyline for how
+     *  these segments are combined or represented.)
+     */
+    public getPolylines(): Polyline[] {
+        // This simplistic example assumes each Ridge corresponds to a two-point polyline
+        //return this.ridges.map(ridge => new Polyline([ridge.start, ridge.end]));
+        throw new Error("TODO: Not implemented");
     }
 }
