@@ -260,11 +260,9 @@ if __name__ == "__main__":
     paths.comment("Overview: ")
     paths.comment("===================================================================================================")
     paths.comment("This is a TypeScript implementation of:")
-    paths.comment("  OpenGIS® Implementation Standard for Geographic Information");
-    paths.comment("    - Simple feature access - Part 1: Common");
-    paths.comment("  REF/link/url: https://portal.ogc.org/files/?artifact_id=25355");
-    paths.comment("")
-    paths.comment("Web Application Structure")
+    paths.comment("  Straight Skeleton algorithm for designing residential roofs, given building footprint");
+    paths.comment("---------------------------------------------------------------------------------------------------")
+    paths.comment("Directory Structure")
     paths.comment("---------------------------------------------------------------------------------------------------")
     paths.include("**/*") \
         .exclude("__pycache__/**") \
@@ -278,18 +276,12 @@ if __name__ == "__main__":
         .generate()
 
     # Instead of creating new paths objects, reuse the same one
-    paths = CodeString.explore(".", includeFileContent=True, debug=True)
+    paths = CodeString.explore("./test", includeFileContent=True, debug=True)
     paths.comment("") # Add blank line
     paths.comment("TypeScript Source Files")
     paths.comment("---------------------------------------------------------------------------------------------------")
-    paths.include("src/**/*.ts") \
-        .include("src/**/*.tsx") \
-        .exclude("test/**/*") \
-        .exclude("src/assets/*") \
-        .exclude("src/**/*.spec.ts") \
-        .exclude("src/**/*.test.ts") \
-        .exclude("src/**/*.spec.tsx") \
-        .exclude("src/**/*.test.tsx") \
+    paths\
+        .include("**/*.ts")\
         .generate()
 
     paths = CodeString.explore(".", includeFileContent=True, debug=True)

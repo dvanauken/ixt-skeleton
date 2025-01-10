@@ -1,3 +1,5 @@
+
+
 export class Vector {
     constructor(
         public readonly x: number,
@@ -27,6 +29,10 @@ export class Vector {
 
     length(): number {
         return Math.sqrt(this.x * this.x + this.y * this.y);
+    }
+
+    lengthSquared(): number {
+        return this.x * this.x + this.y * this.y;
     }
 
     normalize(): Vector {
@@ -94,7 +100,59 @@ export class Vector {
         return sum.normalize();
     }
 
+    // New methods needed for the straight skeleton algorithm:
+
+    distanceToPoint(point: Vector): number {
+        return this.subtract(point).length();
+    }
+
+    distanceToLine(start: Vector, end: Vector): number {
+        const line = end.subtract(start);
+        const pointVector = this.subtract(start);
+        if (line.lengthSquared() === 0) return pointVector.length();
+        
+        const t = Math.max(0, Math.min(1, pointVector.dot(line) / line.lengthSquared()));
+        const projection = start.add(line.scale(t));
+        return this.distanceToPoint(projection);
+    }
+
+    projectOnto(other: Vector): Vector {
+        const len = other.lengthSquared();
+        if (len === 0) throw new Error('Cannot project onto zero vector');
+        return other.scale(this.dot(other) / len);
+    }
+
+    lerp(other: Vector, t: number): Vector {
+        return this.add(other.subtract(this).scale(t));
+    }
+
+    isCollinear(v1: Vector, v2: Vector, epsilon: number = 1e-10): boolean {
+        // Returns true if this point is collinear with points v1 and v2
+        const area = (v2.x - v1.x) * (this.y - v1.y) - 
+                    (this.x - v1.x) * (v2.y - v1.y);
+        return Math.abs(area) < epsilon;
+    }
+
+    static fromAngle(angle: number): Vector {
+        return new Vector(Math.cos(angle), Math.sin(angle));
+    }
+
     toString(): string {
         return `Vector(${this.x}, ${this.y})`;
+    }
+
+    // Utility methods for edge/polygon operations
+    static area2(a: Vector, b: Vector, c: Vector): number {
+        // Returns twice the signed area of the triangle abc
+        return (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    }
+
+    static orientation(a: Vector, b: Vector, c: Vector): number {
+        // Returns:
+        //  1 if abc forms a counter-clockwise turn
+        //  -1 if abc forms a clockwise turn
+        //  0 if abc are collinear
+        const area = Vector.area2(a, b, c);
+        return Math.abs(area) < 1e-10 ? 0 : Math.sign(area);
     }
 }
