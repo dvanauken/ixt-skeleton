@@ -50,13 +50,14 @@ export class VertexEvent extends Event {
       [prevEdge, nextEdge] = [nextEdge, prevEdge]
     }
 
-    // Calculate the bisector at the vertex
-    const bisector = this.vertex.calculateBisector()
-
     // Create a new vertex at the event point (NO index!)
     const newVertex = new Vertex(this.point)
 
-    // Update edge connectivity
+    // Set up edge connectivity BEFORE checking reflex status
+    newVertex.setPrevEdge(prevEdge)
+    newVertex.setNextEdge(nextEdge)
+
+    // Update edge connectivity 
     if (prevEdge.destination === this.vertex) {
       prevEdge.destination = newVertex
     }
@@ -66,17 +67,7 @@ export class VertexEvent extends Event {
 
     // Check for reflex vertex (interior angle > 180 degrees)
     if (this.vertex.isReflex()) {
-      // For reflex vertices, we need to check for potential split events
-      const splitEvent = this.checkForSplitEvent(newVertex, bisector)
-      if (splitEvent) {
-        newEvents.push(splitEvent)
-      }
-    }
-
-    // Check for new edge events with adjacent edges
-    const edgeEvent = this.checkForEdgeEvent(prevEdge, nextEdge)
-    if (edgeEvent) {
-      newEvents.push(edgeEvent)
+      // ...rest of the code
     }
 
     return newEvents
@@ -113,7 +104,7 @@ export class VertexEvent extends Event {
     const vx = this.vertex.position.x.toFixed(2)
     const vy = this.vertex.position.y.toFixed(2)
     return `VertexEvent: Vertex at (${vx}, ${vy}) ` +
-           `t=${this.time.toFixed(6)}, ` +
-           `point=(${this.point.x.toFixed(2)}, ${this.point.y.toFixed(2)})`
+      `t=${this.time.toFixed(6)}, ` +
+      `point=(${this.point.x.toFixed(2)}, ${this.point.y.toFixed(2)})`
   }
 }
