@@ -110,16 +110,17 @@ export class SplitEvent extends Event {
 
         for (const [edge1, edge2] of edgePairs) {
             const collision = edge1.findEdgeEvent(edge2);
-            if (collision && collision.time > currentTime) {
-                events.push(new EdgeEvent(
-                    collision.time,
-                    collision.point,
-                    edge1,
-                    edge2
-                ));
-            }
+        //     if (collision && collision.time > currentTime) {
+        //         events.push(new EdgeEvent(
+        //             collision.time,
+        //             collision.point,
+        //             edge1,
+        //             edge2
+        //         ));
+        //     }
         }
     }
+
 
     toString(): string {
         return `SplitEvent: Reflex vertex ${this.reflexVertex} ` +
