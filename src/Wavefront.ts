@@ -1,192 +1,261 @@
 import { Polygon } from './Polygon';
-import { Edge } from './Edge';
-import { Vertex } from './Vertex';
 import { Vector } from './Vector';
+import { Vertex } from './Vertex';
+import { Edge } from './Edge';
+import { EventQueue } from './EventQueue';
 import { Event } from './events/Event';
-import { EventType } from './events/Event';
+import { EdgeEvent } from './events/EdgeEvent';
 import { SplitEvent } from './events/SplitEvent';
-import { CollapseEvent } from './events/CollapseEvent';
-
-interface WavefrontChain {
-    edges: Edge[];
-    vertices: Vertex[];
-    isActive: boolean;
-}
+import { VertexEvent } from './events/VertexEvent';
 
 export class Wavefront {
-    private chains: WavefrontChain[] = [];
-    private currentTime: number = 0;
+    public vertices: Vertex[];
+    public edges: Edge[];
+    private eventQueue: EventQueue;
+    private time: number;
+    private skeleton: Edge[];
+    private vertexVelocities: Map<Vertex, Vector>;
 
-    constructor(initialPolygon: Polygon) {
-        // Initialize first chain from the input polygon
-        const edges = initialPolygon.getEdges();
-        const vertices = initialPolygon.getVertices();
-        
-        this.chains.push({
-            edges: [...edges],
-            vertices: [...vertices],
-            isActive: true
+    constructor(polygon: Polygon) {
+        this.vertices = [];
+        this.edges = [];
+        this.eventQueue = new EventQueue();
+        this.time = 0;
+        this.skeleton = [];
+        this.vertexVelocities = new Map();
+
+        // Deep copy vertices to create independent wavefront
+        this.vertices = polygon.vertices.map(v => 
+            new Vertex(new Vector(v.position.x, v.position.y))
+        );
+
+        // Create edges and establish connectivity
+        for (let i = 0; i < this.vertices.length; i++) {
+            const nextIndex = (i + 1) % this.vertices.length;
+            const edge = new Edge(this.vertices[i], this.vertices[nextIndex]);
+            this.edges.push(edge);
+            
+            // Set vertex connections
+            this.vertices[i].setNextEdge(edge);
+            this.vertices[nextIndex].setPrevEdge(edge);
+        }
+
+        // Initialize vertex velocities
+        this.vertices.forEach(vertex => {
+            this.updateVertexVelocity(vertex);
         });
+
+        this.findInitialEvents();
     }
 
-    // Update wavefront to a new time, handling topology changes
-    update(event: Event): void {
-        this.currentTime = event.time;
-
-        switch (event.type) {
-            case EventType.EDGE:
-                this.handleEdgeEvent(event);
-                break;
-            case EventType.VERTEX:
-                this.handleVertexEvent(event);
-                break;
-            case EventType.SPLIT:
-                this.handleSplitEvent(event as SplitEvent);
-                break;
-            case EventType.COLLAPSE:
-                this.handleCollapseEvent(event as CollapseEvent);
-                break;
-        }
-
-        // Update positions of all active vertices
-        this.updateVertexPositions();
+    private updateVertexVelocity(vertex: Vertex): void {
+        const bisector = vertex.calculateBisector();
+        const speed = vertex.calculateSpeed();
+        this.vertexVelocities.set(vertex, bisector.scale(speed));
     }
 
-    private updateVertexPositions(): void {
-        for (const chain of this.chains) {
-            if (!chain.isActive) continue;
+    private findInitialEvents(): void {
+        // // Check for edge events
+        // this.edges.forEach(edge => {
+        //     const event = this.computeEdgeEvent(edge);
+        //     if (event) {
+        //         this.eventQueue.push(event);
+        //     }
+        // });
 
-            for (const vertex of chain.vertices) {
-                const newPosition = vertex.computePositionAtTime(this.currentTime);
-                // Create new vertex at updated position
-                const updatedVertex = vertex.clone(newPosition);
-                
-                // Update references in adjacent edges
-                if (vertex.prevEdge) {
-                    if (vertex.prevEdge.destination === vertex) {
-                        //vertex.prevEdge.destination = updatedVertex;
-                    }
-                }
-                if (vertex.nextEdge) {
-                    if (vertex.nextEdge.origin === vertex) {
-                        //vertex.nextEdge.origin = updatedVertex;
-                    }
-                }
-            }
-        }
+        // // Check for split events from reflex vertices
+        // this.vertices.forEach(vertex => {
+        //     if (vertex.isReflex()) {
+        //         const events = this.computeSplitEvents(vertex);
+        //         events.forEach(event => this.eventQueue.push(event));
+        //     }
+        // });
     }
 
-    private handleEdgeEvent(event: Event): void {
-        // Find the chain containing the affected edges
-        const chainIndex = this.findChainContainingVertex(event.vertices[0]);
-        if (chainIndex === -1) return;
-
-        const chain = this.chains[chainIndex];
+    private computeEdgeEvent(edge: Edge): EdgeEvent | null {
+        const v1 = edge.origin;
+        const v2 = edge.destination;
         
-        // Update topology by merging vertices and removing collapsed edge
-        this.mergeVertices(chain, event.vertices, event.point);
+        const v1Velocity = this.vertexVelocities.get(v1);
+        const v2Velocity = this.vertexVelocities.get(v2);
+        
+        if (!v1Velocity || !v2Velocity) return null;
+
+        const relativeVel = v2Velocity.subtract(v1Velocity);
+        const edgeVector = edge.getEdgeVector();
+        
+        if (relativeVel.dot(edgeVector) >= 0) return null;
+
+        const timeToCollapse = edge.getEdgeLength() / relativeVel.length();
+        
+        if (timeToCollapse <= 0) return null;
+
+        // Calculate collapse point
+        const collapsePoint = v1.position.add(edgeVector.scale(0.5));
+
+        // Find the next edge in sequence for proper EdgeEvent construction
+        const nextEdge = v2.nextEdge;
+        
+        return new EdgeEvent(
+            this.time + timeToCollapse,
+            collapsePoint,
+            edge,
+            nextEdge
+        );
     }
 
-    private handleVertexEvent(event: Event): void {
-        // Similar to edge event, but may need special handling for vertex speed
-        const chainIndex = this.findChainContainingVertex(event.vertices[0]);
-        if (chainIndex === -1) return;
+    private computeSplitEvent(vertex: Vertex, edge: Edge): SplitEvent | null {
+        // const velocity = this.vertexVelocities.get(vertex);
+        // if (!velocity) return null;
 
-        const chain = this.chains[chainIndex];
-        this.mergeVertices(chain, event.vertices, event.point);
+        // const trajStart = vertex.position;
+        // const trajEnd = vertex.position.add(velocity);
+        
+        // const intersection = edge.intersect({
+        //     origin: trajStart,
+        //     destination: trajEnd
+        // });
+
+        // if (!intersection) return null;
+
+        // const timeToSplit = intersection.t1;
+        
+        // if (timeToSplit <= 0) return null;
+
+        // const reflexEdges = [vertex.prevEdge, vertex.nextEdge];
+
+        // return new SplitEvent(
+        //     this.time + timeToSplit,
+        //     intersection.point,
+        //     vertex,
+        //     edge,
+        //     reflexEdges
+        // );
+        return null;
+    }
+
+    propagate(timeStep: number): void {
+        const targetTime = this.time + timeStep;
+
+        while (!this.eventQueue.isEmpty() && this.eventQueue.peek()!.time <= targetTime) {
+            const event = this.eventQueue.pop()!;
+            
+            this.moveVerticesToTime(event.time);
+            this.handleEvent(event);
+            this.updateEvents();
+        }
+
+        if (this.time < targetTime) {
+            this.moveVerticesToTime(targetTime);
+        }
+    }
+
+    private moveVerticesToTime(targetTime: number): void {
+        const deltaTime = targetTime - this.time;
+        
+        this.vertices.forEach(vertex => {
+            const velocity = this.vertexVelocities.get(vertex);
+            if (velocity) {
+                const displacement = velocity.scale(deltaTime);
+                vertex.position = vertex.position.add(displacement);
+            }
+        });
+
+        this.time = targetTime;
+    }
+
+    private handleEvent(event: Event): void {
+        if (event instanceof EdgeEvent) {
+            this.handleEdgeEvent(event);
+        } else if (event instanceof SplitEvent) {
+            this.handleSplitEvent(event);
+        }
+
+        this.updateSkeleton(event);
+    }
+
+    private handleEdgeEvent(event: EdgeEvent): void {
+        const edge = event.edge1;
+        const v1 = edge.origin;
+        const v2 = edge.destination;
+
+        const mergePoint = this.calculateEventPoint(event);
+        v1.position = mergePoint;
+
+        this.removeVertex(v2);
+        this.removeEdge(edge);
+        this.vertexVelocities.delete(v2);
+        
+        this.updateVertexVelocity(v1);
+        if (v1.prevEdge) this.updateVertexVelocity(v1.prevEdge.origin);
+        if (v1.nextEdge) this.updateVertexVelocity(v1.nextEdge.destination);
     }
 
     private handleSplitEvent(event: SplitEvent): void {
-        const chainIndex = this.findChainContainingVertex(event.reflexVertex);
-        if (chainIndex === -1) return;
-
-        // Create two new chains from the split
-        const originalChain = this.chains[chainIndex];
+        const vertex = event.reflexVertex;
+        const edge = event.splitEdge;
         const splitPoint = event.point;
 
-        // Find split indices
-        const splitEdgeIndex = originalChain.edges.indexOf(event.splitEdge);
-        const reflexVertexIndex = originalChain.vertices.indexOf(event.reflexVertex);
+        const newVertex = new Vertex(splitPoint);
+        this.vertices.push(newVertex);
 
-        if (splitEdgeIndex === -1 || reflexVertexIndex === -1) return;
-
-        // Create new chains
-        const chain1: WavefrontChain = {
-            edges: originalChain.edges.slice(0, splitEdgeIndex + 1),
-            vertices: originalChain.vertices.slice(0, reflexVertexIndex + 1),
-            isActive: true
-        };
-
-        const chain2: WavefrontChain = {
-            edges: originalChain.edges.slice(splitEdgeIndex + 1),
-            vertices: originalChain.vertices.slice(reflexVertexIndex),
-            isActive: true
-        };
-
-        // Update chain references
-        this.chains[chainIndex] = chain1;
-        this.chains.push(chain2);
+        const newEdge = this.splitEdge(edge, newVertex);
+        
+        this.updateVertexVelocity(newVertex);
+        this.updateVertexVelocity(edge.origin);
+        this.updateVertexVelocity(newEdge.destination);
     }
 
-    private handleCollapseEvent(event: CollapseEvent): void {
-        const chainIndex = this.findChainContainingEdge(event.collapsingChain[0]);
-        if (chainIndex === -1) return;
-
-        const chain = this.chains[chainIndex];
+    private splitEdge(edge: Edge, vertex: Vertex): Edge {
+        const oldDest = edge.destination;
+        const newEdge = new Edge(vertex, oldDest);
         
-        // Mark chain as inactive if it completely collapses
-        if (event.collapsingChain.length === chain.edges.length) {
-            chain.isActive = false;
-        } else {
-            // Update topology by merging vertices at collapse point
-            this.mergeVertices(chain, event.vertices, event.point);
+        edge.destination = vertex;
+        vertex.setPrevEdge(edge);
+        vertex.setNextEdge(newEdge);
+        
+        this.edges.push(newEdge);
+        return newEdge;
+    }
+
+    private removeVertex(vertex: Vertex): void {
+        const index = this.vertices.indexOf(vertex);
+        if (index !== -1) {
+            this.vertices.splice(index, 1);
+        }
+        this.vertexVelocities.delete(vertex);
+    }
+
+    private removeEdge(edge: Edge): void {
+        const index = this.edges.indexOf(edge);
+        if (index !== -1) {
+            this.edges.splice(index, 1);
         }
     }
 
-    private findChainContainingVertex(vertex: Vertex): number {
-        return this.chains.findIndex(chain => 
-            chain.isActive && chain.vertices.includes(vertex)
-        );
+    private updateEvents(): void {
+        this.eventQueue.clear();
+        this.findInitialEvents();
     }
 
-    private findChainContainingEdge(edge: Edge): number {
-        return this.chains.findIndex(chain =>
-            chain.isActive && chain.edges.includes(edge)
-        );
+    private calculateEventPoint(event: Event): Vector {
+        if (event instanceof EdgeEvent) {
+            return event.point;
+        } else if (event instanceof SplitEvent) {
+            return event.point;
+        }
+        throw new Error("Unknown event type");
     }
 
-    private mergeVertices(chain: WavefrontChain, vertices: Vertex[], mergePoint: Vector): void {
-        // Create new vertex at merge point
-        // const newVertex = new Vertex(mergePoint, vertices[0].index);
-
-        // // Update edge references
-        // for (const vertex of vertices) {
-        //     const vertexIndex = chain.vertices.indexOf(vertex);
-        //     if (vertexIndex !== -1) {
-        //         chain.vertices[vertexIndex] = newVertex;
-        //     }
-
-        //     // Update edge endpoints
-        //     if (vertex.prevEdge) {
-        //         if (vertex.prevEdge.destination === vertex) {
-        //             vertex.prevEdge.destination = newVertex;
-        //         }
-        //     }
-        //     if (vertex.nextEdge) {
-        //         if (vertex.nextEdge.origin === vertex) {
-        //             vertex.nextEdge.origin = newVertex;
-        //         }
-        //     }
-        // }
+    private updateSkeleton(event: Event): void {
+        if (event instanceof EdgeEvent) {
+            this.skeleton.push(event.edge1);
+        } else if (event instanceof SplitEvent) {
+            this.skeleton.push(event.splitEdge);
+        }
     }
 
-    // Get current state of all active chains
-    getActiveChains(): WavefrontChain[] {
-        return this.chains.filter(chain => chain.isActive);
-    }
-
-    // Check if wavefront is completely collapsed
-    isComplete(): boolean {
-        return this.chains.every(chain => !chain.isActive);
+    getSkeleton(): Edge[] {
+        return this.skeleton;
     }
 }

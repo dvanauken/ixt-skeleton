@@ -256,7 +256,7 @@ class CodeString:
 
 if __name__ == "__main__":
     # Initialize a single paths object for all explorations
-    paths = CodeString.explore(".", includeFileContent=False, debug=True)
+    paths = CodeString.explore(".", includeFileContent=True, debug=True)
     paths.comment("Overview: ")
     paths.comment("===================================================================================================")
     paths.comment("This is a TypeScript implementation of:")
