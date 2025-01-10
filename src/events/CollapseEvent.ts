@@ -7,10 +7,10 @@ export class CollapseEvent extends Event {
     constructor(
         time: number,
         point: Vector,
-        public readonly collapsingChain: Edge[], // Sequence of edges that will collapse
-        public readonly terminalVertices: Vertex[] // End vertices of the chain
+        public readonly collapsingChain: Edge[],
+        public readonly terminalVertices: Vertex[]
     ) {
-        // Include all vertices from the collapsing chain
+        // Get all vertices involved in the collapse
         const vertices = Array.from(new Set([
             ...collapsingChain.map(edge => edge.origin),
             ...collapsingChain.map(edge => edge.destination)
@@ -18,54 +18,92 @@ export class CollapseEvent extends Event {
         
         super(time, point, EventType.COLLAPSE, vertices);
 
+        // Validate edge chain
         if (collapsingChain.length < 1) {
             throw new Error('Collapse event must involve at least one edge');
         }
 
+        // Validate terminal vertices
         if (terminalVertices.length !== 2) {
             throw new Error('Collapse event must have exactly two terminal vertices');
         }
 
-        // Verify chain connectivity
+        // Validate chain connectivity and terminal vertices
         this.validateChainConnectivity();
     }
 
+    // private validateChainConnectivity(): void {
+    //     // Check that edges form a connected chain
+    //     for (let i = 0; i < this.collapsingChain.length - 1; i++) {
+    //         const currentEdge = this.collapsingChain[i];
+    //         const nextEdge = this.collapsingChain[i + 1];
+    //         const isConnected = currentEdge.destination === nextEdge.origin ||
+    //             currentEdge.destination === nextEdge.destination ||
+    //             currentEdge.origin === nextEdge.origin ||
+    //             currentEdge.origin === nextEdge.destination;
+    //         if (!isConnected) {
+    //             throw new Error('Collapsing edges must form a connected chain');
+    //         }
+    //     }
+
+    //     // Get all vertices in the chain
+    //     const endVertices = new Set([
+    //         this.collapsingChain[0].origin,
+    //         this.collapsingChain[0].destination,
+    //         this.collapsingChain[this.collapsingChain.length - 1].origin,
+    //         this.collapsingChain[this.collapsingChain.length - 1].destination
+    //     ]);
+
+    //     // Check if both terminal vertices are in the set of end vertices
+    //     const terminalVerticesAtEnds = this.terminalVertices.every(v => endVertices.has(v));
+        
+    //     if (!terminalVerticesAtEnds) {
+    //         throw new Error('Terminal vertices must be at the ends of the chain');
+    //     }
+    // }
     private validateChainConnectivity(): void {
         // Check that edges form a connected chain
         for (let i = 0; i < this.collapsingChain.length - 1; i++) {
             const currentEdge = this.collapsingChain[i];
             const nextEdge = this.collapsingChain[i + 1];
-            
-            const isConnected = 
-                currentEdge.destination === nextEdge.origin ||
+            const isConnected = currentEdge.destination === nextEdge.origin ||
                 currentEdge.destination === nextEdge.destination ||
                 currentEdge.origin === nextEdge.origin ||
                 currentEdge.origin === nextEdge.destination;
-
             if (!isConnected) {
                 throw new Error('Collapsing edges must form a connected chain');
             }
         }
 
-        // Verify terminal vertices are at the ends of the chain
+        // Get start and end vertices of the chain
         const firstEdge = this.collapsingChain[0];
         const lastEdge = this.collapsingChain[this.collapsingChain.length - 1];
-        
-        const hasTerminals = 
-            (firstEdge.origin === this.terminalVertices[0] || firstEdge.origin === this.terminalVertices[1] ||
-             firstEdge.destination === this.terminalVertices[0] || firstEdge.destination === this.terminalVertices[1]) &&
-            (lastEdge.origin === this.terminalVertices[0] || lastEdge.origin === this.terminalVertices[1] ||
-             lastEdge.destination === this.terminalVertices[0] || lastEdge.destination === this.terminalVertices[1]);
 
-        if (!hasTerminals) {
+        // Get actual end vertices (considering chain orientation)
+        const startVertex = firstEdge.origin;
+        const endVertex = lastEdge.destination;
+
+        // Check if terminal vertices match the actual ends of the chain
+        const isStartTerminal = this.terminalVertices.includes(startVertex);
+        const isEndTerminal = this.terminalVertices.includes(endVertex);
+
+        if (!isStartTerminal || !isEndTerminal) {
+            throw new Error('Terminal vertices must be at the ends of the chain');
+        }
+
+        // Ensure we have exactly the start and end vertices as terminals
+        if (this.terminalVertices[0] !== startVertex && this.terminalVertices[1] !== startVertex) {
+            throw new Error('Terminal vertices must be at the ends of the chain');
+        }
+        if (this.terminalVertices[0] !== endVertex && this.terminalVertices[1] !== endVertex) {
             throw new Error('Terminal vertices must be at the ends of the chain');
         }
     }
-
+    
     isValid(): boolean {
         // Check if all edges and vertices still exist
         const componentsExist = this.collapsingChain.every(edge => edge) &&
-                              this.terminalVertices.every(vertex => vertex);
+            this.terminalVertices.every(vertex => vertex);
 
         if (!componentsExist) {
             return false;
@@ -96,6 +134,7 @@ export class CollapseEvent extends Event {
 
         // Find edges connected to the chain but not part of it
         const connectedEdges = new Set<Edge>();
+        
         for (const vertex of this.vertices) {
             if (vertex.prevEdge && !this.collapsingChain.includes(vertex.prevEdge)) {
                 connectedEdges.add(vertex.prevEdge);
@@ -116,13 +155,11 @@ export class CollapseEvent extends Event {
         }
 
         // No new events are generated from a collapse
-        // The wavefront topology will be updated by the main algorithm
         return [];
     }
 
     toString(): string {
-        const chainLength = this.collapsingChain.length;
-        return `CollapseEvent: ${chainLength} edges collapse at t=${this.time.toFixed(6)}, ` +
-               `point=(${this.point.x.toFixed(2)}, ${this.point.y.toFixed(2)})`;
+        return `CollapseEvent: ${this.collapsingChain.length} edges collapse at t=${this.time.toFixed(6)}, ` +
+            `point=(${this.point.x.toFixed(2)}, ${this.point.y.toFixed(2)})`;
     }
 }

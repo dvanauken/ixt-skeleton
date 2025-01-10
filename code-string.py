@@ -265,6 +265,11 @@ if __name__ == "__main__":
     paths.comment("Directory Structure")
     paths.comment("---------------------------------------------------------------------------------------------------")
     paths.include("**/*") \
+        .exclude("2024_TIGERLINE_GDB_Record_Layouts.pdf") \
+        .exclude("code-string.py") \
+        .exclude("result.*.txt") \
+        .exclude("scaffold.ps1") \
+        .exclude("skeleton-prompt.txt") \
         .exclude("__pycache__/**") \
         .exclude("node_modules/**") \
         .exclude("dist/**") \
@@ -273,6 +278,7 @@ if __name__ == "__main__":
         .exclude(".vscode/**") \
         .exclude("*.js.map") \
         .exclude("*.css.map") \
+        .exclude("test/**") \
         .generate()
 
     # Instead of creating new paths objects, reuse the same one

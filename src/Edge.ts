@@ -8,6 +8,11 @@ export interface Intersection {
     t2: number;    // Parameter along second edge
 }
 
+export interface EdgeEventResult {
+    time: number;
+    point: Vector;
+}
+
 export class Edge {
     private _origin: Vertex;
     private _destination: Vertex;
@@ -135,30 +140,26 @@ export class Edge {
         return new Edge(newOrigin, newDestination);
     }
 
-    // Event detection for straight skeleton
-    findEdgeEvent(other: Edge): Intersection | null {
-        // Find potential edge event between this edge and another edge
-        const intersection = this.offset(1).intersect(other.offset(1));
+    findEdgeEvent(other: Edge): EdgeEventResult | null {
+        const intersection = this.intersect(other);
+        if (!intersection) return null;
+
+        // Calculate the time when the edges will collide
+        const v1 = this.getEdgeVector();
+        const v2 = other.getEdgeVector();
+        const speed = Math.sqrt(v1.lengthSquared() + v2.lengthSquared());
         
-        if (!intersection) {
-            return null;
-        }
+        if (speed === 0) return null;
 
-        // Verify that the intersection point is moving inward
-        const midpoint = this.pointAt(0.5);
-        const otherMid = other.pointAt(0.5);
-        const center = intersection.point;
+        // Time is proportional to the distance to intersection
+        const time = intersection.t1 * this.getEdgeLength() / speed;
 
-        const v1 = midpoint.subtract(center);
-        const v2 = otherMid.subtract(center);
-
-        // Check if intersection is moving inward
-        if (v1.dot(this.getEdgeNormal()) > 0 && v2.dot(other.getEdgeNormal()) > 0) {
-            return intersection;
-        }
-
-        return null;
+        return {
+            time: time,
+            point: intersection.point
+        };
     }
+
 
     toString(): string {
         return `Edge(${this.origin.position} -> ${this.destination.position})`;

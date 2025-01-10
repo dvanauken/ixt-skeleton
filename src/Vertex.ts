@@ -76,19 +76,18 @@ export class Vertex {
     }
 
     calculateSpeed(): number {
-        // if (!this.hasBothEdges()) {
-        //     throw new Error('Cannot calculate speed without both edges')
-        // }
-
-        // const theta = this.calculateInteriorAngle()
-        // const sinHalfTheta = Math.sin(theta / 2)
+        if (!this.hasBothEdges()) {
+            throw new Error('Cannot calculate speed without both edges');
+        }
         
-        // // if (Math.abs(sinHalfTheta) < 1e-12) {
-        // //     throw new Error('Speed calculation failed: angle results in zero sine')
-        // // }
+        const theta = this.calculateInteriorAngle();
+        const sinHalfTheta = Math.sin(theta / 2);
         
-        // return 1 / sinHalfTheta
-        return 1;
+        if (Math.abs(sinHalfTheta) < 1e-12) {
+            throw new Error('Speed calculation faiqled: angle results in zero sine');
+        }
+        
+        return 1 / sinHalfTheta;
     }
 
     computePositionAtTime(t: number): Vector {
