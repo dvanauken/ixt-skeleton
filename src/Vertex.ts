@@ -18,56 +18,71 @@ export class Vertex {
         this._next = e
     }
 
-    get prevEdge(): Edge {
-        if (!this._prev) throw new Error('Missing prevEdge')
+    get prevEdge(): Edge | null { // Changed return type to Edge | null
         return this._prev
     }
 
-    get nextEdge(): Edge {
-        if (!this._next) throw new Error('Missing nextEdge')
+    get nextEdge(): Edge | null { // Changed return type to Edge | null
         return this._next
     }
 
     hasBothEdges(): boolean {
         return this._prev !== null && this._next !== null;
     }
-
+    // hasBothEdges(): this is { _prev: Edge; _next: Edge } {
+    //     return this._prev !== null && this._next !== null;
+    // }
     calculateBisector(): Vector {
         if (!this.hasBothEdges()) {
-            throw new Error('Cannot calculate bisector without both edges')
+            throw new Error('Cannot calculate bisector without both edges');
         }
 
-        const inc = this.position.subtract(this.prevEdge.origin.position).normalize()
-        const out = this.nextEdge.destination.position.subtract(this.position).normalize()
-        const sum = inc.add(out)
-        
-        // Handle special case of 180-degree angle
-        if (sum.length() < 1e-12) {
-            return inc.perpendicular().normalize()
+        const prevVertex = this.prevEdge!.origin.position;
+        const nextVertex = this.nextEdge!.destination.position;
+
+        // Determine orientation to check if the vertex is reflex
+        const orientation = Vector.orientation(prevVertex, this.position, nextVertex);
+        console.log(`Vertex at ${this.position.toString()}: Orientation = ${orientation}`);
+
+        const inc = this.position.subtract(prevVertex).normalize();
+        const out = nextVertex.subtract(this.position).normalize();
+        console.log(`Incoming Vector: ${inc.toString()}`);
+        console.log(`Outgoing Vector: ${out.toString()}`);
+
+        let bisector: Vector;
+
+        if (orientation === -1) { // Clockwise orientation, reflex vertex
+            bisector = inc.subtract(out).normalize();
+            console.log(`Convex Bisector: ${bisector.toString()}`);
+        } else if (orientation === 1) { // Counter-Clockwise orientation, convex vertex
+            bisector = inc.add(out).normalize();
+            console.log(`Reflex Bisector: ${bisector.toString()}`);
+        } else { // Collinear edges
+            throw new Error('Cannot compute bisector for collinear edges');
         }
-        
-        return sum.normalize()
+
+        return bisector;
     }
 
     calculateInteriorAngle(): number {
         if (!this.hasBothEdges()) {
-            throw new Error('Cannot calculate interior angle without both edges')
+            throw new Error('Cannot calculate interior angle without both edges');
         }
-
-        const inc = this.position.subtract(this.prevEdge.origin.position).normalize()
-        const out = this.nextEdge.destination.position.subtract(this.position).normalize()
+    
+        const inc = this.position.subtract(this.prevEdge!.origin.position).normalize();
+        const out = this.nextEdge!.destination.position.subtract(this.position).normalize();
         
         // Ensure dot product is within valid range for acos
-        const d = Math.min(Math.max(inc.dot(out), -1), 1)
-        let angle = Math.acos(d)
+        const d = Math.min(Math.max(inc.dot(out), -1), 1);
+        let angle = Math.acos(d);
         
         // Adjust angle based on cross product sign for correct orientation
-        const cross = inc.cross(out)
-        if (cross < 0) angle = 2 * Math.PI - angle
+        const cross = inc.cross(out);
+        if (cross < 0) angle = 2 * Math.PI - angle;
         
-        return angle
+        return angle;
     }
-
+    
     isReflex(): boolean {
         if (!this.hasBothEdges()) {
             throw new Error('Cannot determine if vertex is reflex without both edges')

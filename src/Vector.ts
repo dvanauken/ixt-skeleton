@@ -86,21 +86,29 @@ export class Vector {
                Math.abs(this.y - other.y) < epsilon;
     }
 
-    static bisector(v1: Vector, v2: Vector): Vector {
-        const n1 = v1.normalize();
-        const n2 = v2.normalize();
-        const sum = n1.add(n2);
 
-        // Handle special case of opposite vectors
-        if (sum.length() < 1e-10) {
-            // Return perpendicular vector when vectors are opposite
-            return v1.perpendicular().normalize();
+    static bisector(v1: Vector, v2: Vector): Vector {
+        const n1 = v1.normalize()
+        const n2 = v2.normalize()
+
+        // Calculate the signed angle from n1 to n2
+        const angle = n1.angleBetween(n2)
+
+        let bisector: Vector
+
+        if (angle < 0) { // Reflex angle
+            bisector = n1.subtract(n2) // Corrected subtraction order
+        } else { // Convex angle
+            bisector = n1.add(n2)
         }
 
-        return sum.normalize();
-    }
+        // Handle the case where bisector is a zero vector
+        if (bisector.lengthSquared() === 0) {
+            throw new Error('Cannot compute bisector for collinear vectors')
+        }
 
-    // New methods needed for the straight skeleton algorithm:
+        return bisector.normalize()
+    }
 
     distanceToPoint(point: Vector): number {
         return this.subtract(point).length();

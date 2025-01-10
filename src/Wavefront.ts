@@ -80,21 +80,22 @@ export class Wavefront {
         const v2Velocity = this.vertexVelocities.get(v2);
         
         if (!v1Velocity || !v2Velocity) return null;
-
+    
         const relativeVel = v2Velocity.subtract(v1Velocity);
         const edgeVector = edge.getEdgeVector();
         
         if (relativeVel.dot(edgeVector) >= 0) return null;
-
+    
         const timeToCollapse = edge.getEdgeLength() / relativeVel.length();
         
         if (timeToCollapse <= 0) return null;
-
+    
         // Calculate collapse point
         const collapsePoint = v1.position.add(edgeVector.scale(0.5));
-
+    
         // Find the next edge in sequence for proper EdgeEvent construction
         const nextEdge = v2.nextEdge;
+        if (!nextEdge) return null; // Skip if there's no next edge
         
         return new EdgeEvent(
             this.time + timeToCollapse,
@@ -103,7 +104,7 @@ export class Wavefront {
             nextEdge
         );
     }
-
+    
     private computeSplitEvent(vertex: Vertex, edge: Edge): SplitEvent | null {
         // const velocity = this.vertexVelocities.get(vertex);
         // if (!velocity) return null;
