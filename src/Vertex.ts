@@ -97,7 +97,7 @@ export class Vertex {
 
         const bisector = this.calculateBisector()
         const speed = this.calculateSpeed()
-        const distance = t * speed
+        const distance = t / speed
         
         return this.position.add(bisector.scale(distance))
     }

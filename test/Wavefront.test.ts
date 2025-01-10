@@ -4,7 +4,6 @@ import { Wavefront } from '../src/Wavefront';
 import { Vector } from '../src/Vector';
 import { Vertex } from '../src/Vertex';
 import { Polygon } from '../src/Polygon';
-import { Edge } from '../src/Edge';
 
 describe('Wavefront', () => {
     // Helper function to create our test polygon
