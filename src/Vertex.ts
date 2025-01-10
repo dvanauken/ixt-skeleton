@@ -18,27 +18,25 @@ export class Vertex {
         this._next = e
     }
 
-    get prevEdge(): Edge | null { // Changed return type to Edge | null
+    get prevEdge(): Edge | null {
         return this._prev
     }
 
-    get nextEdge(): Edge | null { // Changed return type to Edge | null
+    get nextEdge(): Edge | null {
         return this._next
     }
 
-    hasBothEdges(): boolean {
+    hasBothEdges(): this is Vertex & { prevEdge: Edge; nextEdge: Edge } {
         return this._prev !== null && this._next !== null;
     }
-    // hasBothEdges(): this is { _prev: Edge; _next: Edge } {
-    //     return this._prev !== null && this._next !== null;
-    // }
+
     calculateBisector(): Vector {
         if (!this.hasBothEdges()) {
             throw new Error('Cannot calculate bisector without both edges');
         }
 
-        const prevVertex = this.prevEdge!.origin.position;
-        const nextVertex = this.nextEdge!.destination.position;
+        const prevVertex = this.prevEdge.origin.position;
+        const nextVertex = this.nextEdge.destination.position;
 
         // Determine orientation to check if the vertex is reflex
         const orientation = Vector.orientation(prevVertex, this.position, nextVertex);
@@ -69,8 +67,8 @@ export class Vertex {
             throw new Error('Cannot calculate interior angle without both edges');
         }
     
-        const inc = this.position.subtract(this.prevEdge!.origin.position).normalize();
-        const out = this.nextEdge!.destination.position.subtract(this.position).normalize();
+        const inc = this.position.subtract(this.prevEdge.origin.position).normalize();
+        const out = this.nextEdge.destination.position.subtract(this.position).normalize();
         
         // Ensure dot product is within valid range for acos
         const d = Math.min(Math.max(inc.dot(out), -1), 1);
@@ -99,7 +97,7 @@ export class Vertex {
         const sinHalfTheta = Math.sin(theta / 2);
         
         if (Math.abs(sinHalfTheta) < 1e-12) {
-            throw new Error('Speed calculation faiqled: angle results in zero sine');
+            throw new Error('Speed calculation failed: angle results in zero sine');
         }
         
         return 1 / sinHalfTheta;
@@ -122,12 +120,6 @@ export class Vertex {
             return null
         }
 
-        // Implement split event detection
-        // For each edge not adjacent to this vertex:
-        // 1. Calculate distance from vertex to edge
-        // 2. Calculate time when vertex reaches edge
-        // 3. Return position at minimum valid time
-        
         let minTime = Infinity
         let splitPoint: Vector | null = null
 
