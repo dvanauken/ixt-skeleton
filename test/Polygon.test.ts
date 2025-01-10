@@ -160,17 +160,26 @@ describe('Polygon', () => {
 
         it('should calculate correct edge normals', () => {
             const polygon = createSamplePolygon();
-
+            
             // Test normal of horizontal edge D->E
+            expect(polygon.vertices[3].hasBothEdges()).toBe(true);
             const horizontalEdge = polygon.vertices[3].nextEdge;
+            if (!horizontalEdge) {
+                throw new Error("Expected horizontal edge to exist");
+            }
             const normalDE = horizontalEdge.getEdgeNormal();
             expect(vectorsAreEqual(normalDE, new Vector(0, 1))).toBe(true);
-
+            
             // Test normal of vertical edge A->B
+            expect(polygon.vertices[0].hasBothEdges()).toBe(true);
             const verticalEdge = polygon.vertices[0].nextEdge;
+            if (!verticalEdge) {
+                throw new Error("Expected vertical edge to exist");
+            }
             const normalAB = verticalEdge.getEdgeNormal();
             expect(vectorsAreEqual(normalAB, new Vector(1, 0))).toBe(true);
         });
+
     });
 
     describe('Edge Cases and Special Configurations', () => {
